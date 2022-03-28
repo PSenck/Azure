@@ -28,6 +28,7 @@ azure_metadata_file_path = "Measurement-data/metadata_OPCUA.ods"
 [pull_azure_file(connection_string= connection_string, share_name= share_name, azure_file_path= i) for i in [azure_exp_file_path, azure_metadata_file_path]]
 
 
+possible_error_messages = ["The Dataframe is empty", "`first_step` exceeds bounds.", "The length of the data points in the measurement data is smaller than the number of the fit parameters with vary == True"]
 
 #select your variables to be displayed
 measurement_vars = Variables["typ1"]["measurement_vars"]        #typ2
@@ -431,15 +432,16 @@ def create_data(n_intervals, hours, n_clicks, n_clicks_error, parest_mode, data,
         "params" : {}
         }
 
+        if str(Errormessage) in possible_error_messages:
+            Errormessage = "There may be not enough measurement datapoints to perform a parameter estimation."
+
+
+
 
     return json.dumps(all_data), iteration_nr, [f"Clicked {n_clicks} times"], [f"Clicked {n_clicks_error} times"], str(Errormessage)
 
 
 if __name__ == "__main__":
-    dash_app.run_server(debug = True, host='0.0.0.0', port='8000')     #debug=True, host='localhost' , host="0.0.0.0"
+    dash_app.run_server(debug = True, host='0.0.0.0', port='8000')     #für windows: debug=False, host='localhost' , host="0.0.0.0" 
 
-# visit http://localhost:7777/ in your web browser.
-
-
-#sqlite3.DatabaseError: database disk image is malformed
 

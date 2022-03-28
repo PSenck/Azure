@@ -2,3 +2,4 @@ __pycache__/
 set_connstr.sh
 Measurement-data/
 venv/
+test.ipynb
