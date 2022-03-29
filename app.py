@@ -1,4 +1,3 @@
-import dash_bootstrap_components as dbc
 from biomoni import Experiment, Yeast
 from biomoni import visualize
 from biomoni.file_manager import pull_azure_file
