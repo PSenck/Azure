@@ -1,4 +1,3 @@
-from click import style
 import dash_bootstrap_components as dbc
 from biomoni import Experiment, Yeast
 from biomoni import visualize
