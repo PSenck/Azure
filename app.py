@@ -1,8 +1,10 @@
-
+from click import style
+import dash_bootstrap_components as dbc
 from biomoni import Experiment, Yeast
 from biomoni import visualize
 from biomoni.file_manager import pull_azure_file
 import os
+import plotly.express as px
 
 import os
 import numpy as np
@@ -20,12 +22,11 @@ import json
 
 
 #download data from Azure
-#connection_string = os.getenv("connection_string")
 connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 share_name = "biomoni-storage"
 azure_exp_file_path = "Measurement-data/current_ferm/data.csv" 
 azure_metadata_file_path = "Measurement-data/metadata_OPCUA.ods"
-[pull_azure_file(connection_string= connection_string, share_name= share_name, azure_file_path= i) for i in [azure_exp_file_path, azure_metadata_file_path]]
+
 
 
 possible_error_messages = ["The Dataframe is empty", "`first_step` exceeds bounds.", "The length of the data points in the measurement data is smaller than the number of the fit parameters with vary == True"]
@@ -46,13 +47,15 @@ path = "Measurement-data"
 
 all_vars = set([*measurement_vars, *simulated_vars])    #All variables only once, used to display the options in the dropdown at the initial callback
 
-#color dict to style your layout
+
 colors = {
-    "background": "oxy",
-    "text": "green",
-    "settings" : "lightyellow",
-    "table_header" : "red",
-    "table_background" : "grey"
+    "background": "#383434",
+    "text": "#f0ffff",
+    "settings" : "#474a50",
+    "table_header" : "#3a3f4b",
+    "table_background" : "#474a50",
+    "dropdown_background" : "black",
+    "dropdown_text" : "white"
 }
 
 
@@ -74,14 +77,32 @@ def generate_table(dataframe, no_cols = []):
         ])
     ])
 
+#style = {"backgroundColor": colors["background"], "color" : colors["text"], "textAlign": "center"}, id = "initial_message",
+initial_start_message =  html.Div(children = ["Please wait, the initial steps are being executed"])
+
+after_initial_callback_message = html.Div(children= ["A web application framework for your data.", 
+        #dcc.Markdown("""For more information visit [biomoni](https://github.com/PSenck/biomoni)""", style = {"backgroundColor": colors["background"]})
+        ])
 
 #Layout
-dash_app.layout = html.Div(style={"backgroundColor": colors["background"]}, children=[
+dash_app.layout = html.Div(style={"backgroundColor": colors["background"], "height" : "100vh","width" : "100%",'padding': "1px", "margin" : "1px", 'margin-left' : "1px", 'margin-top' : "1px"}, children=[
+
+
+    html.H1(
+        children= "Biomonitoring Dashboard",
+        style={
+            "textAlign": "center",
+            "color": colors["text"]
+        }
+    ),
+    html.Div(style = {"backgroundColor": colors["background"], "color" : colors["text"], "textAlign": "center"}, id = "initial_message",children = [initial_start_message]),
+
+
 
     html.Div(id = "Error_div", children = [
-        html.H2("Something went wrong, an error occurred within the 'create_data' callback with the following description:"),
-        html.Div(children = [], id = "Errormessage"),
-        html.Button(id="button_error", children="Try again", style = {"color": colors["text"],"backgroundColor" : colors["settings"]}),
+        html.H2("Something went wrong, an error occurred within the 'create_data' callback with the following description:", style={"color": colors["text"]}),
+        html.Div(children = [], id = "Errormessage", style = {"color" : colors["text"]}),
+        html.Button(id="button_error", children="Try again", style = {"color": colors["text"],"backgroundColor" : colors["settings"], "margin-top" : 10}),
         html.P(id="error_clicks", children=["Button not clicked"], style = {"color": colors["text"],"backgroundColor" : colors["settings"]}),
     ], style = {"display" : "None", "textAlign": "center", "backgroundColor" : colors["settings"]} ),
 
@@ -95,21 +116,6 @@ dash_app.layout = html.Div(style={"backgroundColor": colors["background"]}, chil
 
         dcc.Store(id = "data_store"),
 
-        html.H1(
-            children= "Biomonitoring Dashboard",
-            style={
-                "textAlign": "center",
-                "color": colors["text"]
-            }
-        ),
-
-        html.Div(children= ["A web application framework for your data.", 
-            #dcc.Markdown("""For more information visit [biomoni](https://github.com/PSenck/biomoni)""")     #htlm.A geht auch für link
-            ], style={
-            "textAlign": "center",
-            "color": colors["text"]
-        }),
-
         html.Br(),
 
         html.Div([
@@ -121,6 +127,7 @@ dash_app.layout = html.Div(style={"backgroundColor": colors["background"]}, chil
                     options=[{'label': i, 'value': i} for i in measurement_vars],
                     value = measurement_vars ,
                     multi = True,
+                    style = {"backgroundColor" : colors["settings"]}    #here
             
                 ),
                 html.Div("Displayed variables of simulated data", style =  {"color" : colors["text"]}),
@@ -129,6 +136,7 @@ dash_app.layout = html.Div(style={"backgroundColor": colors["background"]}, chil
                     options=[{'label': i, 'value': i} for i in simulated_vars],
                     value = [],
                     multi = True,
+                    style = {"backgroundColor" : colors["settings"]}    #here
             
                 ),
                 
@@ -149,7 +157,9 @@ dash_app.layout = html.Div(style={"backgroundColor": colors["background"]}, chil
                     id='secondary_yaxis',
                     options=[{'label': i, 'value': i} for i in all_vars],
                     value =  [],
-                    multi = True
+                    multi = True,
+                    style = {"backgroundColor" : colors["settings"]}        #here
+    
                 ),
             
 
@@ -165,62 +175,94 @@ dash_app.layout = html.Div(style={"backgroundColor": colors["background"]}, chil
 
         dcc.Graph(
             id = "graph1",
-            figure={} 
+            figure= px.scatter().update_layout(paper_bgcolor= colors["background"], plot_bgcolor= colors["background"], font_color= colors["text"])
 
         ),
-
+        
         html.Div([
-        html.Button(id = "options_button", children = "Show options", style={'display': 'inline-block', 'vertical-align': 'middle',"min-width": "150px",
-            'height': "25px",
-            "margin-top": "0px",
-            "margin-left": "5px",
-            "color": colors["text"],
-            "backgroundColor" : colors["settings"]}),
-        ], style = {"textAlign": "center"}),
+            html.Div("Simulation time in hours: ", style =  {"color" : colors["text"]}),
 
+            dcc.Input(id= "sim_time", value= 10, type='number', style = {"backgroundColor" : colors["settings"], "color" : colors["text"]}),  #here      #, style = {"backgroundColor" : colors["settings"], "color" : colors["text"]}
 
-        html.Div(id = "options_div", children = [
+        ], style = {"backgroundColor" : colors["background"], "margin-bottom": "30px"}),            
+
+        dcc.Loading( id = "loading_1", type = "default", children = [  
             html.Div([
-                html.Div("Simulation time in hours: ", style =  {"color" : colors["text"]}),
-                dcc.Input(id= "sim_time", value= 10, type='number'),
-            ], style = {"backgroundColor" : colors["settings"], "margin-bottom": "30px"}),
+                html.Button(id = "options_button", children = "Show options", style={'display': 'inline-block', 'vertical-align': 'middle',"min-width": "150px",
+                    'height': "25px",
+                    "margin-top": "0px",
+                    "margin-left": "5px",
+                    "color": colors["text"],
+                    "backgroundColor" : colors["settings"]}),
+            ], style = {"textAlign": "center"}),
 
-            html.Div([
-
-                html.Div([
-                    html.Div("Manual parameter estimation", style =  {"color" : colors["text"], "margin-bottom": "10px"}),
-                    html.Button(id="button_id", children="Estimate!", style = {"color": colors["text"],"backgroundColor" : colors["settings"]}),
-                    html.Div([html.P(id="paragraph_id", children=["Button not clicked"], style = {"color": colors["text"],"backgroundColor" : colors["settings"]})]),
-
-            ], style={'width': '48%', 'display': 'inline-block'}),
-
-                html.Div([
-                    html.Div("Automatic parameter estimation", style =  {"color" : colors["text"]}),
-                    dcc.RadioItems(
-                        id= "automatic_parest",
-                        options=[{'label': i, 'value': i} for i in ['enabled', 'disabled']],
-                        value= "enabled",
-                        labelStyle={'display': 'inline-block'},
-                        style = {"color" : colors["text"]} )
-
-                ], style={'width': '48%', 'float': 'right', 'display': 'inline-block'})
-                
-            ], style = {"backgroundColor" : colors["settings"]}),
             
+            html.Div(id = "options_div", children = [
 
-            dash_table.DataTable(
-                id="table_params",
-                columns= [],             
-                data= [],     
-                style_header={
-                "color" : colors["text"],
-                'backgroundColor': colors["table_background"],
-                'fontWeight': 'bold'},
-            ),
+                html.Div([
 
-            html.Div("This is before any iterations of dcc.Interval", id = "iteration_identifier")
-        ], style = {}),
-        ], style = {})
+                    html.Div([
+                        html.Div("Manual parameter estimation", style =  {"color" : colors["text"], "margin-bottom": "10px"}),
+                        html.Button(id="button_id", children="Estimate", style = {"color": colors["text"],"backgroundColor" : colors["settings"]}),
+                        html.Div([html.P(id="paragraph_id", children=["Button not clicked"], style = {"color": colors["text"],"backgroundColor" : colors["settings"]})]),
+
+                    ], style={'width': '48%', 'display': 'inline-block'}),
+
+                    html.Div([
+                        html.Div("Automatic parameter estimation", style =  {"color" : colors["text"]}),
+                        dcc.RadioItems(
+                            id= "automatic_parest",
+                            options=[{'label': i, 'value': i} for i in ['enabled', 'disabled']],
+                            value= "enabled",
+                            labelStyle={'display': 'inline-block'},
+                            style = {"color" : colors["text"]} )
+
+                    ], style={'width': '48%', 'float': 'right', 'display': 'inline-block'})
+                    
+                ], style = {"backgroundColor" : colors["settings"]}),
+
+                dash_table.DataTable(
+                    
+                    id="table_params",
+                    columns= [],             
+                    data= [],
+
+                    style_cell={"color" : colors["text"], "backgroundColor" : colors["background"]},  
+
+                    style_header={
+                    "color" : colors["text"],
+                    'backgroundColor': colors["table_background"],
+                    'fontWeight': 'bold',
+                    "textAlign" : "left"},
+                    
+                    style_cell_conditional=[
+                        {
+                            'if': {'column_id': "vary"},
+                            'textAlign': 'center',
+
+
+                        } 
+                    ],
+
+                    css=[
+
+                        {
+
+                            "selector":
+                            ".dash-spreadsheet-container .Select-value-label",
+                            "rule": "color: {}".format(colors["text"])                      
+
+                        },
+                    ],
+
+                ), 
+
+                html.Div("This is before any iterations of dcc.Interval", id = "iteration_identifier", style = {"color" : colors["text"]} )
+            ], style = {}),
+        ]) 
+    ], style = {"display" : "None"})
+        
+
 ])
 
 
@@ -282,14 +324,16 @@ def update_graph_1(jsonified_data, meas_vars, sim_vars, secondary_yaxis, yaxis_t
             [cols_measured.append(i) for i in list(measured_data[typ].columns)]
 
         
-        fig = visualize(measured_data, simulated_data,  secondary_y_cols= secondary_yaxis, yaxis_type = yaxis_type, sec_yaxis_type = secondary_yaxis_type )
+        fig = visualize(measured_data, simulated_data,  secondary_y_cols= secondary_yaxis, yaxis_type = yaxis_type, sec_yaxis_type = secondary_yaxis_type
+        , paper_bgcolor= colors["background"], plot_bgcolor= colors["background"], font_color= colors["text"], title_x= 1) #for complete trasnaprency : paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor= colors["background"]
+        
         all_columns = set(cols_measured + list(simulated_data.columns))
         options_sec_y=[{'label': i, 'value': i} for i in all_columns]
 
   
 
     else:
-        fig = {}
+        fig = px.scatter().update_layout(paper_bgcolor= colors["background"], plot_bgcolor= colors["background"], font_color= colors["text"])
         options_sec_y = [{'label': i, 'value': i} for i in all_vars]
     
     
@@ -313,19 +357,20 @@ def update_table_params(jsonified_data):
             column_type = "numeric" if col not in ["vary", "name"] else "text" 
             #presentation = "dropdown" if col in ["vary"] else None
             if col in ["vary"]:
-                dic = {"name": col, "id": col, "editable" : editable_flag, "type": column_type, "format" : Format(precision=5), "presentation": "dropdown"}    #, 'presentation': 'dropdown'
+                dic = {"name": col, "id": col, "editable" : editable_flag, "type": column_type, "format" : Format(precision=5), "presentation": "dropdown" }    #, 'presentation': 'dropdown'
             else: 
                 dic = {"name": col, "id": col, "editable" : editable_flag, "type": column_type, "format" : Format(precision=5)}
             
-            dropdown={
-                'vary': {
-                    'options': [
-                        {'label': str(i), 'value': str(i)}
-                        for i in params['vary'].unique()
-                    ]
-                , "clearable" : False } }        
             col_names.append(dic)
-
+        dropdown={
+            'vary': {
+                'options': [
+                    {'label': str(i), 'value': str(i)}
+                    for i in params['vary'].unique()
+                ]
+            , "clearable" : False 
+            }
+        } 
 
         return col_names, params.to_dict("records"), dropdown
     else:
@@ -339,6 +384,7 @@ Output("iteration_identifier", "children"),
 Output("paragraph_id", "children"),
 Output("error_clicks", "children"),
 Output("Errormessage", "children"),
+Output("initial_message", "children"),
 Input("interval", "n_intervals"),
 Input("sim_time", "value"),
 Input("button_id", "n_clicks"),
@@ -360,8 +406,10 @@ def create_data(n_intervals, hours, n_clicks, n_clicks_error, parest_mode, data,
     
 
     if last_input == "" or last_input == "button_error" or Errormessage != "None":        #
-        pull_azure_file(connection_string= connection_string, share_name= share_name, azure_file_path= azure_exp_file_path)
+
         try:
+            #Pull both, metadata and measurement data  
+            [pull_azure_file(connection_string= connection_string, share_name= share_name, azure_file_path= i) for i in [azure_exp_file_path, azure_metadata_file_path]]
             Exp = Exp_class(path, **experiment_options)
             y = model_class()
             y.estimate(Exp, **estimation_options)
@@ -433,12 +481,12 @@ def create_data(n_intervals, hours, n_clicks, n_clicks_error, parest_mode, data,
         }
 
         if str(Errormessage) in possible_error_messages:
-            Errormessage = "There may be not enough measurement datapoints to perform a parameter estimation."
+            Errormessage = "There may be not enough measurement datapoints to perform a parameter estimation. The Errormessage is: {}".format(Errormessage)
 
 
 
 
-    return json.dumps(all_data), iteration_nr, [f"Clicked {n_clicks} times"], [f"Clicked {n_clicks_error} times"], str(Errormessage)
+    return json.dumps(all_data), iteration_nr, [f"Clicked {n_clicks} times"], [f"Clicked {n_clicks_error} times"], str(Errormessage), after_initial_callback_message
 
 
 if __name__ == "__main__":
