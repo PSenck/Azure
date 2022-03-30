@@ -3,3 +3,5 @@ set_connstr.sh
 Measurement-data/
 venv/
 test.ipynb
+test.py
+testi_app.py

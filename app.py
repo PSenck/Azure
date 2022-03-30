@@ -5,6 +5,7 @@ import os
 import plotly.express as px
 
 import os
+import difflib
 import numpy as np
 import pandas as pd
 
@@ -21,13 +22,15 @@ import json
 
 #download data from Azure
 connection_string = os.getenv("STORAGE_CONNECTION_STRING")
+connection_string = "DefaultEndpointsProtocol=https;AccountName=biomonistorage;AccountKey=hwA0oCscA7HbTxYvkyainLR/5WrVk3lBkfsiCTJEbQCTAur5BHddOVnRxJlgt0iSxqxufqBmQUZvGCk3epXXBQ==;EndpointSuffix=core.windows.net"
 share_name = "biomoni-storage"
 azure_exp_file_path = "Measurement-data/current_ferm/data.csv" 
 azure_metadata_file_path = "Measurement-data/metadata_OPCUA.ods"
 
 
 
-possible_error_messages = ["The Dataframe is empty", "`first_step` exceeds bounds.", "The length of the data points in the measurement data is smaller than the number of the fit parameters with vary == True"]
+data_error_messages = ["The Dataframe is empty", "`first_step` exceeds bounds.", "The length of the data points in the measurement data is smaller than the number of the fit parameters with vary == True"]
+Azure_error_messages = ["The specified parent path does not exist.", "The specified share does not exist.", "urllib3.connection.HTTPSConnection", "'NoneType' object has no attribute 'rstrip'"]
 
 #select your variables to be displayed
 measurement_vars = Variables["typ1"]["measurement_vars"]        #typ2
@@ -478,8 +481,11 @@ def create_data(n_intervals, hours, n_clicks, n_clicks_error, parest_mode, data,
         "params" : {}
         }
 
-        if str(Errormessage) in possible_error_messages:
+        if any(difflib.SequenceMatcher(None, str(Errormessage)[0:len(i)], i ).ratio() >0.7 for i in data_error_messages):
             Errormessage = "There may be not enough measurement datapoints to perform a parameter estimation. The Errormessage is: {}".format(Errormessage)
+        
+        elif any(difflib.SequenceMatcher(None, str(Errormessage)[0:len(i)], i ).ratio() >0.7 for i in Azure_error_messages):
+            Errormessage = "There are problems with the connection to Azure, did you use the right connection string? Are the data available on Azure? The Errormessage is: {}".format(Errormessage)
 
 
 
@@ -488,6 +494,6 @@ def create_data(n_intervals, hours, n_clicks, n_clicks_error, parest_mode, data,
 
 
 if __name__ == "__main__":
-    dash_app.run_server(debug = True, host='0.0.0.0', port='8000')     #für windows: debug=False, host='localhost' , host="0.0.0.0" 
+    dash_app.run_server(debug = True, host='0.0.0.0', port='8001')     #für windows: debug=False, host='localhost' , host="0.0.0.0" 
 
 
