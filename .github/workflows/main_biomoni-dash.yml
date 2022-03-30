@@ -60,4 +60,4 @@ jobs:
         with:
           app-name: 'biomoni-dash'
           slot-name: 'Production'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_1BAC6A623D7549C98497D405EF9FE313 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_0D109650E224409292F0706DA6768709 }}
