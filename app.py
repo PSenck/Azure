@@ -20,16 +20,14 @@ from settings_dash import kwargs_experiment, kwargs_estimate, Variables
 import json
 
 
+#This code has to be adapted
+########################################
 #download data from Azure
 connection_string = os.getenv("STORAGE_CONNECTION_STRING")
 share_name = "biomoni-storage"
 azure_exp_file_path = "Measurement-data/current_ferm/data.csv" 
 azure_metadata_file_path = "Measurement-data/metadata_OPCUA.ods"
 
-
-
-data_error_messages = ["The Dataframe is empty", "`first_step` exceeds bounds.", "The length of the data points in the measurement data is smaller than the number of the fit parameters with vary == True"]
-Azure_error_messages = ["The specified parent path does not exist.", "The specified share does not exist.", "urllib3.connection.HTTPSConnection", "'NoneType' object has no attribute 'rstrip'"]
 
 #select your variables to be displayed
 measurement_vars = Variables["typ1"]["measurement_vars"]        #typ2
@@ -57,25 +55,20 @@ colors = {
     "dropdown_background" : "black",
     "dropdown_text" : "white"
 }
-
+#This code should always work
+##########################################
 
 #Create dash app
 dash_app = dash.Dash(__name__)     #external_stylesheets = external_stylesheets      #, long_callback_manager = long_callback_manager
 app = dash_app.server
 
-def generate_table(dataframe, no_cols = []):         
-    "Function to create a HTML table from pandas dataframe"
-    columns = [col for col in dataframe.columns if col not in no_cols]
-    return html.Table([
-        html.Thead(
-            html.Tr([html.Th(col) for col in columns])
-        ),
-        html.Tbody([
-            html.Tr([
-                html.Td(dataframe.iloc[i][col]) for col in columns
-            ]) for i in range(len(dataframe))       #, style = {"color" : colors["text"]}
-        ])
-    ])
+#Naming
+p_fullnames = model_class.p_full_names    #required to convert short param names to fullnames in datatable (update_table_params callback)
+p_fullnames_revert = {val: key for key,val in p_fullnames.items()} #required to convert names back to short names to perform operations (create_data callback)
+
+#Errors
+data_error_messages = ["The Dataframe is empty", "`first_step` exceeds bounds.", "The length of the data points in the measurement data is smaller than the number of the fit parameters with vary == True"]
+Azure_error_messages = ["The specified parent path does not exist.", "The specified share does not exist.", "urllib3.connection.HTTPSConnection", "'NoneType' object has no attribute 'rstrip'"]
 
 #style = {"backgroundColor": colors["background"], "color" : colors["text"], "textAlign": "center"}, id = "initial_message",
 initial_start_message =  html.Div(children = ["Please wait, the initial steps are being executed"])
@@ -239,9 +232,15 @@ dash_app.layout = html.Div(style={"backgroundColor": colors["background"], "heig
                         {
                             'if': {'column_id': "vary"},
                             'textAlign': 'center',
+                            #"width": "10%"
 
+                        },
+                        {
+                            'if': {'column_id': "name"},
+                            'textAlign': 'left',
+                            "width": "10%"
 
-                        } 
+                        }  
                     ],
 
                     css=[
@@ -351,6 +350,7 @@ def update_table_params(jsonified_data):
     params = data["params"]
     if params:      #check if list is empty
         params = pd.DataFrame(params).T
+        [params.replace(i, p_fullnames[i], inplace = True) for i in params["name"].values if i in p_fullnames.keys()]   #rename from short names to fullnames to display in table
         col_names = []
         for col in params.columns:
             editable_flag = col in ["vary", "min", "max", "value"]
@@ -424,6 +424,7 @@ def create_data(n_intervals, hours, n_clicks, n_clicks_error, parest_mode, data,
             Exp = Exp_class(path, **experiment_options)
             y = model_class()
             params = pd.DataFrame(data, columns=[c['name'] for c in columns]).set_index("name")
+            [params.rename(index = {i : p_fullnames_revert[i]}, inplace= True) for i in params.index if i in p_fullnames_revert.keys()] #rename back to short names to perform operations
             for p, row in params.iterrows():
                 if row["vary"] in ["True", "true"]: 
                     row["vary"] = True
@@ -493,6 +494,6 @@ def create_data(n_intervals, hours, n_clicks, n_clicks_error, parest_mode, data,
 
 
 if __name__ == "__main__":
-    dash_app.run_server(debug = True, host='0.0.0.0', port='8001')     #für windows: debug=False, host='localhost' , host="0.0.0.0" 
+    dash_app.run_server(debug = True, host='0.0.0.0', port='8000')     #für windows: debug=False, host='localhost' , host="0.0.0.0" 
 
 
