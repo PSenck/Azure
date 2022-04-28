@@ -55,12 +55,12 @@ kwargs_experiment = {       #setting to create Experiment object
 kwargs_estimate = {         #settings to estimate
 
     "typ1" : dict (
-    tau = 1, 
-    max_nfev = 40      #max function evaluations
+    #tau = 1, 
+    max_nfev = 100      #max function evaluations
     ),
 
     "typ2" : dict(
-        max_nfev = 40
+        max_nfev = 100
     )
 
 }

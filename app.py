@@ -18,32 +18,73 @@ from dash.dependencies import Input, Output, State
 from settings_dash import kwargs_experiment, kwargs_estimate, Variables
 
 import json
-
+import traceback
 
 #This code has to be adapted
-########################################
-#download data from Azure
+######has to be adapted######
+
+# Description
+# In the following you have 3 options: 
+# Option 1. Load the data directly from Azure.
+# Option 2. Load the data from the automatically generated folder. created from Data_collector during an online estimation
+# Option 3. Load the  measurement data from F4,F5,F6.F7 or F8 
+
+#Please comment only one of those options (1,2,3) in and the other options out
+
+######Option 1: Load from Azure##### comment in or out
+# #To create a Environmental variable that contains the connection string do the following: Linux/macOS: export STORAGE_CONNECTION_STRING="<yourconnectionstring>"
+# #Windows: setx STORAGE_CONNECTION_STRING "<yourconnectionstring>", for development purposes you can also write out the connection string but dont puplish it since people could do harm with it.
+load_from_azure = True #this is used later in the callbacks, if True data is pulled from Azure
+path = "Measurement-data"
 connection_string = os.getenv("STORAGE_CONNECTION_STRING")
+connection_string = "DefaultEndpointsProtocol=https;AccountName=biomonistorage;AccountKey=hwA0oCscA7HbTxYvkyainLR/5WrVk3lBkfsiCTJEbQCTAur5BHddOVnRxJlgt0iSxqxufqBmQUZvGCk3epXXBQ==;EndpointSuffix=core.windows.net"
 share_name = "biomoni-storage"
 azure_exp_file_path = "Measurement-data/current_ferm/data.csv" 
 azure_metadata_file_path = "Measurement-data/metadata_OPCUA.ods"
-
-
 #select your variables to be displayed
-measurement_vars = Variables["typ1"]["measurement_vars"]        #typ2
-simulated_vars = Variables["typ1"]["simulated_vars"]
-
-#This code block are asignments, in order to work with your individual data, use your Experiment class and the respective options to run their constructors
-Exp_class = Experiment      #assign your Experiment class to Exp_class
-model_class = Yeast         #assign your Model class to model_class
+measurement_vars = Variables["typ1"]["measurement_vars"]    #all possible measurement variables (shown in the diagram)
+simulated_vars = Variables["typ1"]["simulated_vars"]        #all possible simulated variables (shown in the diagram)
 experiment_options = kwargs_experiment["typ1"]       #use ur options to create an Experiment
 estimation_options = kwargs_estimate["typ1"]         #use ur options to estimate
-
-#Using on, off, CO2 data from F7
-path = "Measurement-data"
+######Option 1: Load from Azure##### comment in or out
 
 
-all_vars = set([*measurement_vars, *simulated_vars])    #All variables only once, used to display the options in the dropdown at the initial callback
+
+# ######Option 2: the automatically generated folder##### comment in or out
+# load_from_azure = False
+# Result_path = "/home/paul/pCloudDrive/Code/biomoni/Messdaten/OPCUA"  
+# path = Result_path       
+# #This code block finds the path which was last modified within Result_path
+# sub_paths = next(os.walk(Result_path))[1]       #yields the subsirectory in the given path
+# newest_results_dir = max([os.path.join(Result_path,i) for i in sub_paths], key=os.path.getmtime) #gives newest subdirectory
+# exp_dir_manual = newest_results_dir     #manually given subdirectory with measurement data because exp_id does not match with the actual directory in this case
+# kwargs_experiment["typ1"]["exp_dir_manual"] = exp_dir_manual      #add the directory to the key word 
+# experiment_options = kwargs_experiment["typ1"]       
+# estimation_options = kwargs_estimate["typ1"] 
+# measurement_vars = Variables["typ1"]["measurement_vars"]        
+# simulated_vars = Variables["typ1"]["simulated_vars"]
+# ######Option 2: the automatically generated folder##### comment in or out
+
+
+
+# ######Option 3: Load the  measurement data from F4,F5,F6.F7 or F8##### comment in or out
+# load_from_azure = False
+# path = "/home/paul/pCloudDrive/Code/biomoni/Messdaten"
+# experiment_options = kwargs_experiment["typ2"]       
+# estimation_options = kwargs_estimate["typ2"]  
+# measurement_vars = Variables["typ2"]["measurement_vars"]        
+# simulated_vars = Variables["typ2"]["simulated_vars"]
+# experiment_options["exp_id"] = "F7"
+# ######Option 3: Load the  measurement data from F4,F5,F6.F7 or F8##### comment in or out
+
+
+
+#choose your Model and your Experiment class
+Exp_class = Experiment      #assign your Experiment class to Exp_class
+model_class = Yeast         #assign your Model class to model_class
+
+
+
 
 
 colors = {
@@ -55,8 +96,13 @@ colors = {
     "dropdown_background" : "black",
     "dropdown_text" : "white"
 }
+######has to be adapted######
+
+
 #This code should always work
 ##########################################
+
+all_vars = set([*measurement_vars, *simulated_vars])    #All variables only once, used to display the options in the dropdown at the initial callback
 
 #Create dash app
 dash_app = dash.Dash(__name__)     #external_stylesheets = external_stylesheets      #, long_callback_manager = long_callback_manager
@@ -266,36 +312,126 @@ dash_app.layout = html.Div(style={"backgroundColor": colors["background"], "heig
 
 
 
-@dash_app.callback(
-    Output("layout", "style"),
-    Output("Error_div", "style"),
-    Input("Errormessage", "children")
-)
-def change_layout(Errormessage):
+
     
-    if Errormessage == "None":
-        layout_style = {}
-        message_style = {"display" : "None", "textAlign": "center", "backgroundColor" : colors["settings"]}
-    else:
-        layout_style = {"display" : "None"}
-        message_style = {"textAlign": "center", "backgroundColor" : colors["settings"]}
-    return layout_style, message_style
+
 
 @dash_app.callback(
-    Output("options_button", "children"),
-    Output("options_div", "style"),
-    Input("options_button", "n_clicks")
+Output("data_store", "data"),
+Output("iteration_identifier", "children"),
+Output("paragraph_id", "children"),
+Output("error_clicks", "children"),
+Output("Errormessage", "children"),
+Output("initial_message", "children"),
+Input("interval", "n_intervals"),
+Input("sim_time", "value"),
+Input("button_id", "n_clicks"),
+Input("button_error", "n_clicks"),
+State("automatic_parest", "value"),
+State("table_params", "data"),
+State("table_params", "columns"),
+State("Errormessage", "children"),
+running=[
+    (Output("button_id", "disabled"), True, False),
+    (Output("callback_check", "children"), "callback is currently running", "callback is not running")
+],
 )
-def show_options(n_clicks):
-
-    if n_clicks is None or (n_clicks % 2) == 0 or n_clicks == 0:
-        button_text = "Show options"
-        style = {"display" : "None"}
-    else:
-        button_text = "Hide options"
-        style = {"backgroundColor" : colors["settings"]}
+def create_data(n_intervals, hours, n_clicks, n_clicks_error, parest_mode, data, columns, Errormessage):
+    ctx = dash.callback_context
+    last_input = ctx.triggered[0]["prop_id"].split(".")[0]
+    print(last_input)
+    iteration_nr = "This is iteration: " + str(n_intervals)
     
-    return button_text, style
+
+    if last_input == "" or last_input == "button_error" or Errormessage != "None":        #
+
+        try:
+            if load_from_azure == True:
+                [pull_azure_file(connection_string= connection_string, share_name= share_name, azure_file_path= i) for i in [azure_exp_file_path, azure_metadata_file_path]] #load mata data and measurement data from azure
+            Exp = Exp_class(path, **experiment_options)
+            y = model_class()
+            y.estimate(Exp, **estimation_options)
+            Errormessage = None
+        except Exception:
+            Errormessage = traceback.format_exc()
+
+
+    elif last_input != '':
+        try:
+            if load_from_azure == True:
+                pull_azure_file(connection_string= connection_string, share_name= share_name, azure_file_path= azure_exp_file_path) #load measurement data from azure
+            Exp = Exp_class(path, **experiment_options)
+            y = model_class()
+            params = pd.DataFrame(data, columns=[c['name'] for c in columns]).set_index("name")
+            [params.rename(index = {i : p_fullnames_revert[i]}, inplace= True) for i in params.index if i in p_fullnames_revert.keys()] 
+            for p, row in params.iterrows():
+                if row["vary"] in ["True", "true"]: 
+                    row["vary"] = True
+                elif row["vary"] in ["False", "false"]:
+                    row["vary"] = False
+
+                y.change_params(p, vary= row["vary"], value= row["value"], min= row["min"], max= row["max"])
+
+            if last_input == "interval":
+                if parest_mode == "enabled":
+                    print("Automatic parameter estimation")
+                    y.estimate(Exp, **estimation_options)
+            
+
+            elif last_input == "button_id":
+                y.estimate(Exp, **estimation_options)
+
+            Errormessage = None
+
+        except Exception as ex:
+            Errormessage = traceback.format_exc()
+        
+    if Errormessage is None:
+        t_grid = np.linspace(0,hours, round(hours*60)) 
+        sim = y.simulate(Exp, t_grid = t_grid)
+            
+        #dataset = Exp.dataset
+        p_dict = {}
+        for p, val in y.p.items():
+            p_dict[p] = {
+                "name": val.name,
+                "value": val.value,
+                "vary": str(val.vary),      #str because json converts boolen True to string true, there 
+                "min" : val.min,
+                "max" : val.max,
+                }
+
+        dataset = {}
+        for typ, df in Exp.dataset.items():
+            dataset[typ] = df.to_json(orient = "split", date_format = "iso")
+        
+        all_data = {
+        "measured_data" : dataset,
+        "simulated_data" : sim.to_json(orient = "split", date_format = "iso"),
+        "params" : p_dict
+        }
+
+        
+    elif Errormessage is not None:
+
+        all_data ={
+        "measured_data" : {},
+        "simulated_data" : {},
+        "params" : {}
+        }
+
+
+        if any(i in Errormessage for i in data_error_messages):
+            Errormessage = "There may be not enough measurement datapoints to perform a parameter estimation. The Errormessage is: {}".format(Errormessage)
+        
+        elif any(i in Errormessage for i in Azure_error_messages):
+            Errormessage = "There are problems with the connection to Azure, did you use the right connection string? Are the data available on Azure? The Errormessage is: {}".format(Errormessage)
+
+
+    return json.dumps(all_data), iteration_nr, [f"Clicked {n_clicks} times"], [f"Clicked {n_clicks_error} times"], str(Errormessage), after_initial_callback_message
+
+
+
 
 @dash_app.callback(
     Output("graph1", "figure"),
@@ -375,125 +511,45 @@ def update_table_params(jsonified_data):
         return col_names, params.to_dict("records"), dropdown
     else:
         return [], [], {}
-    
+
 
 
 @dash_app.callback(
-Output("data_store", "data"),
-Output("iteration_identifier", "children"),
-Output("paragraph_id", "children"),
-Output("error_clicks", "children"),
-Output("Errormessage", "children"),
-Output("initial_message", "children"),
-Input("interval", "n_intervals"),
-Input("sim_time", "value"),
-Input("button_id", "n_clicks"),
-Input("button_error", "n_clicks"),
-State("automatic_parest", "value"),
-State("table_params", "data"),
-State("table_params", "columns"),
-State("Errormessage", "children"),
-running=[
-    (Output("button_id", "disabled"), True, False),
-    (Output("callback_check", "children"), "callback is currently running", "callback is not running")
-],
+    Output("layout", "style"),
+    Output("Error_div", "style"),
+    Input("Errormessage", "children")
 )
-def create_data(n_intervals, hours, n_clicks, n_clicks_error, parest_mode, data, columns, Errormessage):
-    ctx = dash.callback_context
-    last_input = ctx.triggered[0]["prop_id"].split(".")[0]
-    print(last_input)
-    iteration_nr = "This is iteration: " + str(n_intervals)
+def change_layout(Errormessage):
+    "This callback changes the layout accordning to Errormessage, if Errormessage is not None the graph layout will be displayed"
+    if Errormessage == "None":
+        layout_style = {}
+        message_style = {"display" : "None", "textAlign": "center", "backgroundColor" : colors["settings"]}
+    else:
+        layout_style = {"display" : "None"}
+        message_style = {"textAlign": "center", "backgroundColor" : colors["settings"]}
+    return layout_style, message_style
+
+@dash_app.callback(
+    Output("options_button", "children"),
+    Output("options_div", "style"),
+    Input("options_button", "n_clicks")
+)
+def show_options(n_clicks):
+    "Show options if 'Show options' button is clicked"
+
+    if n_clicks is None or (n_clicks % 2) == 0 or n_clicks == 0:
+        button_text = "Show options"
+        style = {"display" : "None"}
+    else:
+        button_text = "Hide options"
+        style = {"backgroundColor" : colors["settings"]}
     
+    return button_text, style
 
-    if last_input == "" or last_input == "button_error" or Errormessage != "None":        #
-
-        try:
-            #Pull both, metadata and measurement data  
-            [pull_azure_file(connection_string= connection_string, share_name= share_name, azure_file_path= i) for i in [azure_exp_file_path, azure_metadata_file_path]]
-            Exp = Exp_class(path, **experiment_options)
-            y = model_class()
-            y.estimate(Exp, **estimation_options)
-            Errormessage = None
-        except Exception as ex:
-            Errormessage = ex
-
-
-    elif last_input != '':
-        try:
-            pull_azure_file(connection_string= connection_string, share_name= share_name, azure_file_path= azure_exp_file_path)
-            Exp = Exp_class(path, **experiment_options)
-            y = model_class()
-            params = pd.DataFrame(data, columns=[c['name'] for c in columns]).set_index("name")
-            [params.rename(index = {i : p_fullnames_revert[i]}, inplace= True) for i in params.index if i in p_fullnames_revert.keys()] #rename back to short names to perform operations
-            for p, row in params.iterrows():
-                if row["vary"] in ["True", "true"]: 
-                    row["vary"] = True
-                elif row["vary"] in ["False", "false"]:
-                    row["vary"] = False
-
-                y.change_params(p, vary= row["vary"], value= row["value"], min= row["min"], max= row["max"])
-
-            if last_input == "interval":
-                if parest_mode == "enabled":
-                    print("Automatic parameter estimation")
-                    y.estimate(Exp, **estimation_options)
-            
-
-            elif last_input == "button_id":
-                y.estimate(Exp, **estimation_options)
-
-            Errormessage = None
-
-        except Exception as ex:
-            Errormessage= ex
-        
-    if Errormessage is None:
-        t_grid = np.linspace(0,hours, round(hours*60)) 
-        sim = y.simulate(Exp, t_grid = t_grid)
-            
-        #dataset = Exp.dataset
-        p_dict = {}
-        for p, val in y.p.items():
-            p_dict[p] = {
-                "name": val.name,
-                "value": val.value,
-                "vary": str(val.vary),      #str because json converts boolen True to string true, there 
-                "min" : val.min,
-                "max" : val.max,
-                }
-
-        dataset = {}
-        for typ, df in Exp.dataset.items():
-            dataset[typ] = df.to_json(orient = "split", date_format = "iso")
-        
-        all_data = {
-        "measured_data" : dataset,
-        "simulated_data" : sim.to_json(orient = "split", date_format = "iso"),
-        "params" : p_dict
-        }
-
-        
-    elif Errormessage is not None:
-
-        all_data ={
-        "measured_data" : {},
-        "simulated_data" : {},
-        "params" : {}
-        }
-
-        if any(difflib.SequenceMatcher(None, str(Errormessage)[0:len(i)], i ).ratio() >0.7 for i in data_error_messages):
-            Errormessage = "There may be not enough measurement datapoints to perform a parameter estimation. The Errormessage is: {}".format(Errormessage)
-        
-        elif any(difflib.SequenceMatcher(None, str(Errormessage)[0:len(i)], i ).ratio() >0.7 for i in Azure_error_messages):
-            Errormessage = "There are problems with the connection to Azure, did you use the right connection string? Are the data available on Azure? The Errormessage is: {}".format(Errormessage)
-
-
-
-
-    return json.dumps(all_data), iteration_nr, [f"Clicked {n_clicks} times"], [f"Clicked {n_clicks_error} times"], str(Errormessage), after_initial_callback_message
 
 
 if __name__ == "__main__":
-    dash_app.run_server(debug = True, host='0.0.0.0', port='8000')     #für windows: debug=False, host='localhost' , host="0.0.0.0" 
+    #dash_app.run_server(debug = True, host='0.0.0.0', port='8000')     #Linux comment only one in or out
+    dash_app.run_server(debug = False, host='localhost', port='8000')   #windows
 
 
