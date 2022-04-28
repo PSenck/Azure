@@ -24,7 +24,7 @@ kwargs_experiment = {       #setting to create Experiment object
     index_ts = {"on_CO2" : 0},
     read_csv_settings = {"on_CO2" : dict(sep=";",encoding= "unicode_escape",decimal=",", skiprows=[1,2] , skipfooter=1, usecols = None, engine="python")},
     to_datetime_settings = {"on_CO2" : dict(format = "%d.%m.%Y  %H:%M:%S", exact= False, errors = "coerce") },
-    calc_rate =("on_CO2", "BASET"),
+    calc_rate ={"on_CO2": "BASET"},
     read_excel_settings = dict(engine = "odf")
 
     ),
@@ -43,7 +43,7 @@ kwargs_experiment = {       #setting to create Experiment object
     , "on": dict(format = "%d.%m.%Y  %H:%M:%S", exact= False, errors = "coerce")
     , "CO2" : dict(format = "%d.%m.%Y %H:%M:%S", exact= False, errors = "coerce")   }
 
-    , calc_rate = ("on", "BASET")
+    , calc_rate = {"on" : "BASET"}
     , exp_dir_manual = None
     , endpoint = "end1"
     , read_excel_settings = None
